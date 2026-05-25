@@ -7,6 +7,8 @@ import authRoutes from './routes/authRoutes.js';
 const app = express();
 app.use(cors());
 
+app.disable('etag');
+
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);

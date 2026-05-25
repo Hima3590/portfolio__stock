@@ -173,7 +173,12 @@ export const getLivePrice = async (req, res) => {
     const response = await axios.get(url);
     const quote = response.data['Global Quote'];
 
+    console.log(`[DEBUG] Symbol: ${cacheKey}, API_KEY exists: ${!!API_KEY}`);
+    console.log(`[DEBUG] API Response:`, response.data);
+    console.log(`[DEBUG] Quote data:`, quote);
+
     if (!quote || !quote['05. price']) {
+      console.error(`[ERROR] No price for ${cacheKey}. Response:`, response.data);
       return res.status(400).json({ error: 'Price unavailable' });
     }
 
