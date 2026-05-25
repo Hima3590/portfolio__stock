@@ -8,9 +8,13 @@ const app = express();
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Reflect localhost dev origins (3000, 3001, etc.); allow non-browser clients (no Origin)
-    if (!origin || /^http:\/\/localhost:\d+$/.test(origin)) {
-      callback(null, origin ?? true);
+    // Allows localhost development OR your deployed frontend on Render
+    if (
+      !origin || 
+      /^http:\/\/localhost:\d+$/.test(origin) || 
+      origin === 'https://onrender.com'
+    ) {
+      callback(null, true); // Change to true to properly validate the origin
     } else {
       callback(new Error('Not allowed by CORS'));
     }
@@ -19,6 +23,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 
 app.disable('etag');
 
