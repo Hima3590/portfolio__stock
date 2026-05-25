@@ -11,6 +11,9 @@ const stockSchema = new mongoose.Schema({
 { timestamps: true}
 );
 
+//indexing
+stockSchema.index({ user: 1, symbol: 1 });
+
 const Stock = mongoose.model('Stock', stockSchema);
 
 export default Stock;
