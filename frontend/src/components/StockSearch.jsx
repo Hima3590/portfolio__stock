@@ -23,9 +23,12 @@ export default function StockSearch({ onSelectStock }) {
     try {
       const data = await searchStocks(query);
       setResults(data);
+      if (!data?.length) {
+        setError('No stocks found for that query.');
+      }
     } catch (err) {
       console.error(err);
-      setError('Failed to fetch stocks.');
+      setError(err.response?.data?.error || 'Failed to fetch stocks.');
     } finally {
       setLoading(false);
     }

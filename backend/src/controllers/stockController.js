@@ -1,7 +1,7 @@
 import Stock from '../models/Stock.js';
 import axios from 'axios';
 
-const API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const getApiKey = () => process.env.ALPHA_VANTAGE_API_KEY;
 
 // Global in-memory cache
 const alphaVantageCache = new Map();
@@ -28,7 +28,7 @@ export const createStock = async (req, res) => {
       currentPrice = cachedItem.data.price;
     } else {
       try {
-        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${API_KEY}`;
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
         const response = await axios.get(url);
         const quote = response.data['Global Quote'];
         if (quote && quote['05. price']) {
@@ -133,8 +133,20 @@ export const searchStock = async (req, res) => {
       return res.json(cachedItem.data);
     }
 
-    const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${searchKey}&apikey=${API_KEY}`;
-    const response = await axios.get(url);
+    if (!getApiKey()) {
+      return res.status(503).json({ error: 'Stock search is unavailable (API key not configured)' });
+    }
+
+    const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${searchKey}&apikey=${getApiKey()}`;
+    const response = await axios.get(url, { timeout: 15000 });
+
+    const rateLimitMsg = response.data.Note || response.data.Information;
+    if (rateLimitMsg) {
+      console.error('[Alpha Vantage] Search rate limit:', rateLimitMsg);
+      return res.status(503).json({
+        error: 'Stock search is temporarily unavailable (API rate limit). Try again in a minute.'
+      });
+    }
 
     const results = (response.data.bestMatches || []).map(match => ({
       symbol: match['1. symbol'].toUpperCase(),
@@ -169,16 +181,11 @@ export const getLivePrice = async (req, res) => {
       return res.json(cachedItem.data);
     }
 
-    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${API_KEY}`;
+    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
     const response = await axios.get(url);
     const quote = response.data['Global Quote'];
 
-    console.log(`[DEBUG] Symbol: ${cacheKey}, API_KEY exists: ${!!API_KEY}`);
-    console.log(`[DEBUG] API Response:`, response.data);
-    console.log(`[DEBUG] Quote data:`, quote);
-
     if (!quote || !quote['05. price']) {
-      console.error(`[ERROR] No price for ${cacheKey}. Response:`, response.data);
       return res.status(400).json({ error: 'Price unavailable' });
     }
 
@@ -223,7 +230,7 @@ export const getPortfolioStockInfo = async (req, res) => {
       currentPrice = cachedItem.data.price;
     } else {
       try {
-        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${API_KEY}`;
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
         const response = await axios.get(url);
         const quote = response.data['Global Quote'];
         
@@ -278,7 +285,7 @@ export const getPortfolioOverview = async (req, res) => {
         stockCurrentPrice = cachedItem.data.price;
       } else {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${API_KEY}`;
+          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
           const response = await axios.get(url);
           const quote = response.data['Global Quote'];
           
@@ -343,7 +350,7 @@ export const getStockSummary = async (req, res) => {
         stockCurrentPrice = cachedItem.data.price;
       } else {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${API_KEY}`;
+          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
           const response = await axios.get(url);
           const quote = response.data['Global Quote'];
           
@@ -408,7 +415,7 @@ export const getPortfolioBreakdown = async (req, res) => {
         currentPrice = cachedItem.data.price;
       } else {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${API_KEY}`;
+          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
           const response = await axios.get(url);
           const quote = response.data['Global Quote'];
           
