@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { searchStocks, getPortfolioStockInfo, getLivePrice } from '../api/stockApi';
 
 export default function StockSearch({ onSelectStock }) {
@@ -111,7 +111,15 @@ export default function StockSearch({ onSelectStock }) {
         <div className="mt-2 p-4 border border-gray-700 rounded-lg bg-gray-900">
           <p className="text-white"><strong>Live Price:</strong> ${stockInfo.currentPrice.toFixed(2)}</p>
           {stockInfo.notInPortfolio ? (
-            <p className="text-gray-400 italic mt-2">Add this stock to your portfolio to track profit/loss</p>
+            <div className="mt-3">
+              <p className="text-gray-400 italic mb-3">Add this stock to your portfolio to track profit/loss</p>
+              <button
+                onClick={() => document.getElementById('add-stock-form')?.scrollIntoView({ behavior: 'smooth' })}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+              >
+                ✓ Use {stockInfo.symbol} to Add Stock
+              </button>
+            </div>
           ) : (
             <>
               <p className="text-white">

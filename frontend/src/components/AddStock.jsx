@@ -1,19 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { addStock } from '../api/stockApi';
 
-export default function AddStock({ onStockAdded }) {
-  const [symbol, setSymbol] = useState('');
+export default function AddStock({ onStockAdded, prefilledSymbol = '' }) {
+  const [symbol, setSymbol] = useState(prefilledSymbol);
   const [quantity, setQuantity] = useState('');
   const [buyPrice, setBuyPrice] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Update symbol when prefilledSymbol prop changes
+  useEffect(() => {
+    setSymbol(prefilledSymbol);
+  }, [prefilledSymbol]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     
     try {
+      // Extract only the ticker symbol (part before ' - ')
+      const tickerSymbol = symbol.split(' - ')[0].toUpperCase().trim();
+      
       await addStock({
-        symbol: symbol.toUpperCase(),
+        symbol: tickerSymbol,
         quantity: parseFloat(quantity),
         buyPrice: parseFloat(buyPrice)
       });
@@ -36,7 +44,7 @@ export default function AddStock({ onStockAdded }) {
   };
 
   return (
-    <div className="mb-12">
+    <div className="mb-12" id="add-stock-form">
       <h2 className="text-2xl font-bold mb-6 text-white">Add Stock</h2>
       <form onSubmit={handleSubmit} className="flex gap-4 flex-wrap bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
         <input

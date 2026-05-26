@@ -1,10 +1,10 @@
 import Stock from '../models/Stock.js';
 import axios from 'axios';
 
-const getApiKey = () => process.env.ALPHA_VANTAGE_API_KEY;
+const getApiKey = () => process.env.FINNHUB_API_KEY;
 
 // Global in-memory cache
-const alphaVantageCache = new Map();
+const finnhubCache = new Map();
 
 /* ===============================
    CRUD OPERATIONS
@@ -21,21 +21,20 @@ export const createStock = async (req, res) => {
 
     const cacheKey = symbol.toUpperCase();
     let currentPrice = buyPrice; 
-    const cachedItem = alphaVantageCache.get(cacheKey);
+    const cachedItem = finnhubCache.get(cacheKey);
 
     // ⚡ OPTIMIZATION: Check cache first to save an API call during creation
     if (cachedItem && (Date.now() - cachedItem.timestamp < 3 * 60 * 1000)) {
       currentPrice = cachedItem.data.price;
     } else {
       try {
-        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
+        const url = `https://finnhub.io/api/v1/quote?symbol=${cacheKey}&token=${getApiKey()}`;
         const response = await axios.get(url);
-        const quote = response.data['Global Quote'];
-        if (quote && quote['05. price']) {
-          currentPrice = parseFloat(quote['05. price']);
+        if (response.data && response.data.c) {
+          currentPrice = parseFloat(response.data.c);
           
           // Seed the cache with the new price
-          alphaVantageCache.set(cacheKey, { 
+          finnhubCache.set(cacheKey, { 
             data: { symbol: cacheKey, price: currentPrice }, 
             timestamp: Date.now() 
           });
@@ -125,7 +124,7 @@ export const searchStock = async (req, res) => {
 
     const searchKey = q.toUpperCase();
     const cacheKey = `SEARCH_${searchKey}`;
-    const cachedItem = alphaVantageCache.get(cacheKey);
+    const cachedItem = finnhubCache.get(cacheKey);
 
     // ⚡ OPTIMIZATION: Cache the search suggestions mapping to avoid rate-limits
     if (cachedItem && (Date.now() - cachedItem.timestamp < 10 * 60 * 1000)) { // 10 min cache for search
@@ -137,24 +136,16 @@ export const searchStock = async (req, res) => {
       return res.status(503).json({ error: 'Stock search is unavailable (API key not configured)' });
     }
 
-    const url = `https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${searchKey}&apikey=${getApiKey()}`;
+    const url = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(searchKey)}&token=${getApiKey()}`;
     const response = await axios.get(url, { timeout: 15000 });
 
-    const rateLimitMsg = response.data.Note || response.data.Information;
-    if (rateLimitMsg) {
-      console.error('[Alpha Vantage] Search rate limit:', rateLimitMsg);
-      return res.status(503).json({
-        error: 'Stock search is temporarily unavailable (API rate limit). Try again in a minute.'
-      });
-    }
-
-    const results = (response.data.bestMatches || []).map(match => ({
-      symbol: match['1. symbol'].toUpperCase(),
-      name: match['2. name'],
-      region: match['4. region']
+    const results = (response.data.result || []).map(match => ({
+      symbol: match.symbol.toUpperCase(),
+      name: match.description,
+      region: match.type || 'N/A'
     }));
 
-    alphaVantageCache.set(cacheKey, { data: results, timestamp: Date.now() });
+    finnhubCache.set(cacheKey, { data: results, timestamp: Date.now() });
 
     console.log(`⏱️ [Latency] searchStock took ${(performance.now() - startTime).toFixed(2)}ms`);
     return res.json(results);
@@ -174,27 +165,26 @@ export const getLivePrice = async (req, res) => {
     if (!symbol) return res.status(400).json({ error: 'Symbol required' });
 
     const cacheKey = symbol.toUpperCase();
-    const cachedItem = alphaVantageCache.get(cacheKey);
+    const cachedItem = finnhubCache.get(cacheKey);
 
     if (cachedItem && (Date.now() - cachedItem.timestamp < 3 * 60 * 1000)) {
       console.log(`🚀 [Cache Hit] Serving live price for ${cacheKey}`);
       return res.json(cachedItem.data);
     }
 
-    const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
+    const url = `https://finnhub.io/api/v1/quote?symbol=${cacheKey}&token=${getApiKey()}`;
     const response = await axios.get(url);
-    const quote = response.data['Global Quote'];
 
-    if (!quote || !quote['05. price']) {
+    if (!response.data || response.data.c === undefined) {
       return res.status(400).json({ error: 'Price unavailable' });
     }
 
     const responseData = {
       symbol: cacheKey,
-      price: parseFloat(quote['05. price'])
+      price: parseFloat(response.data.c)
     };
 
-    alphaVantageCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+    finnhubCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
 
     console.log(`⏱️ [Latency] getLivePrice took ${(performance.now() - startTime).toFixed(2)}ms`);
     return res.json(responseData);
@@ -224,19 +214,18 @@ export const getPortfolioStockInfo = async (req, res) => {
     if (!stock) return res.status(404).json({ error: 'Stock not in portfolio' });
 
     let currentPrice = stock.currentPrice || stock.buyPrice;
-    const cachedItem = alphaVantageCache.get(cacheKey);
+    const cachedItem = finnhubCache.get(cacheKey);
 
     if (cachedItem && (Date.now() - cachedItem.timestamp < 3 * 60 * 1000)) {
       currentPrice = cachedItem.data.price;
     } else {
       try {
-        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
+        const url = `https://finnhub.io/api/v1/quote?symbol=${cacheKey}&token=${getApiKey()}`;
         const response = await axios.get(url);
-        const quote = response.data['Global Quote'];
         
-        if (quote && quote['05. price']) {
-          currentPrice = parseFloat(quote['05. price']);
-          alphaVantageCache.set(cacheKey, { 
+        if (response.data && response.data.c) {
+          currentPrice = parseFloat(response.data.c);
+          finnhubCache.set(cacheKey, { 
             data: { symbol: cacheKey, price: currentPrice }, 
             timestamp: Date.now() 
           });
@@ -274,36 +263,47 @@ export const getPortfolioOverview = async (req, res) => {
   try {
     const userId = req.userId;
     const stocks = await Stock.find({ user: userId }).lean();
+    
+    console.log(`[Portfolio Overview] Found ${stocks.length} stocks for user ${userId}`);
 
     // Parallelize external API network requests using Promise.all
     const stockDataResults = await Promise.all(stocks.map(async (stock) => {
       const cacheKey = stock.symbol.toUpperCase();
       let stockCurrentPrice = stock.currentPrice || stock.buyPrice;
-      const cachedItem = alphaVantageCache.get(cacheKey);
+      const cachedItem = finnhubCache.get(cacheKey);
 
       if (cachedItem && (Date.now() - cachedItem.timestamp < 3 * 60 * 1000)) {
+        console.log(`[Cache Hit] ${cacheKey}: ${cachedItem.data.price}`);
         stockCurrentPrice = cachedItem.data.price;
       } else {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
+          const url = `https://finnhub.io/api/v1/quote?symbol=${cacheKey}&token=${getApiKey()}`;
           const response = await axios.get(url);
-          const quote = response.data['Global Quote'];
           
-          if (quote && quote['05. price']) {
-            stockCurrentPrice = parseFloat(quote['05. price']);
-            alphaVantageCache.set(cacheKey, { 
+          console.log(`[Finnhub Response] ${cacheKey}:`, JSON.stringify(response.data));
+          
+          if (response.data && response.data.c) {
+            stockCurrentPrice = parseFloat(response.data.c);
+            console.log(`[Price Updated] ${cacheKey}: ${stockCurrentPrice}`);
+            finnhubCache.set(cacheKey, { 
               data: { symbol: cacheKey, price: stockCurrentPrice }, 
               timestamp: Date.now() 
             });
+          } else {
+            console.warn(`[Warning] No price found for ${cacheKey} in Finnhub response`);
           }
         } catch (apiErr) {
-          console.error(`[API Error] Overview price fetch for ${cacheKey}:`, apiErr.message);
+          console.error(`[API Error] Overview price fetch failed for ${cacheKey}:`, apiErr.message);
         }
       }
 
+      const invested = stock.buyPrice * stock.quantity;
+      const current = stockCurrentPrice * stock.quantity;
+      console.log(`[Calculation] ${cacheKey}: invested=${invested}, current=${current}`);
+
       return {
-        investedValue: stock.buyPrice * stock.quantity,
-        currentValue: stockCurrentPrice * stock.quantity
+        investedValue: invested,
+        currentValue: current
       };
     }));
 
@@ -319,6 +319,7 @@ export const getPortfolioOverview = async (req, res) => {
     const profitLoss = totalCurrentValue - totalInvested;
     const profitLossPercent = totalInvested === 0 ? 0 : (profitLoss / totalInvested) * 100;
 
+    console.log(`[Portfolio Overview Final] Invested=${totalInvested}, Current=${totalCurrentValue}, Profit=${profitLoss}`);
     console.log(`⏱️ [Latency] getPortfolioOverview took ${(performance.now() - startTime).toFixed(2)}ms`);
 
     return res.json({
@@ -344,25 +345,28 @@ export const getStockSummary = async (req, res) => {
     const stockSummaryResults = await Promise.all(stocks.map(async (stock) => {
       const cacheKey = stock.symbol.toUpperCase();
       let stockCurrentPrice = stock.currentPrice || stock.buyPrice;
-      const cachedItem = alphaVantageCache.get(cacheKey);
+      const cachedItem = finnhubCache.get(cacheKey);
 
       if (cachedItem && (Date.now() - cachedItem.timestamp < 3 * 60 * 1000)) {
         stockCurrentPrice = cachedItem.data.price;
       } else {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
+          const url = `https://finnhub.io/api/v1/quote?symbol=${cacheKey}&token=${getApiKey()}`;
           const response = await axios.get(url);
-          const quote = response.data['Global Quote'];
           
-          if (quote && quote['05. price']) {
-            stockCurrentPrice = parseFloat(quote['05. price']);
-            alphaVantageCache.set(cacheKey, { 
+          console.log(`[Finnhub Response] ${cacheKey}:`, JSON.stringify(response.data));
+          
+          if (response.data && response.data.c) {
+            stockCurrentPrice = parseFloat(response.data.c);
+            finnhubCache.set(cacheKey, { 
               data: { symbol: cacheKey, price: stockCurrentPrice }, 
               timestamp: Date.now() 
             });
+          } else {
+            console.warn(`[Warning] No price found for ${cacheKey} in Finnhub response`);
           }
         } catch (apiErr) {
-          console.error(`[API Error] Summary price fetch for ${cacheKey}:`, apiErr.message);
+          console.error(`[API Error] Summary price fetch failed for ${cacheKey}:`, apiErr.message);
         }
       }
 
@@ -409,25 +413,28 @@ export const getPortfolioBreakdown = async (req, res) => {
     const breakdown = await Promise.all(stocks.map(async (stock) => {
       const cacheKey = stock.symbol.toUpperCase();
       let currentPrice = stock.currentPrice || stock.buyPrice;
-      const cachedItem = alphaVantageCache.get(cacheKey);
+      const cachedItem = finnhubCache.get(cacheKey);
 
       if (cachedItem && (Date.now() - cachedItem.timestamp < 3 * 60 * 1000)) {
         currentPrice = cachedItem.data.price;
       } else {
         try {
-          const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${cacheKey}&apikey=${getApiKey()}`;
+          const url = `https://finnhub.io/api/v1/quote?symbol=${cacheKey}&token=${getApiKey()}`;
           const response = await axios.get(url);
-          const quote = response.data['Global Quote'];
           
-          if (quote && quote['05. price']) {
-            currentPrice = parseFloat(quote['05. price']);
-            alphaVantageCache.set(cacheKey, { 
+          console.log(`[Finnhub Response] ${cacheKey}:`, JSON.stringify(response.data));
+          
+          if (response.data && response.data.c) {
+            currentPrice = parseFloat(response.data.c);
+            finnhubCache.set(cacheKey, { 
               data: { symbol: cacheKey, price: currentPrice }, 
               timestamp: Date.now() 
             });
+          } else {
+            console.warn(`[Warning] No price found for ${cacheKey} in Finnhub response`);
           }
         } catch (apiErr) {
-          console.error(`[API Error] Breakdown price fetch for ${cacheKey}:`, apiErr.message);
+          console.error(`[API Error] Breakdown price fetch failed for ${cacheKey}:`, apiErr.message);
         }
       }
 

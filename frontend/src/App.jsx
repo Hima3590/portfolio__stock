@@ -14,10 +14,18 @@ import './index.css';
 function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showRegister, setShowRegister] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState('');
 
   const { token, logout } = useContext(AuthContext); // 🔹 reactive token
 
-  const handleStockAdded = () => setRefreshTrigger(prev => prev + 1);
+  const handleStockAdded = () => {
+    setRefreshTrigger(prev => prev + 1);
+    setSelectedSymbol(''); // Clear selected symbol after adding
+  };
+
+  const handleSelectStock = (stock) => {
+    setSelectedSymbol(stock.symbol);
+  };
 
   // 🔐 NOT LOGGED IN
   if (!token) {
@@ -46,11 +54,11 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-8 py-12">
-        <StockSearch onSelectStock={(stock)=>alert(`selected :${stock.symbol}`)} />
+        <StockSearch onSelectStock={handleSelectStock} />
         <StockSummary refreshTrigger={refreshTrigger} />
         <PortfolioOverview />
         <PortfolioCharts refreshTrigger={refreshTrigger} />
-        <AddStock onStockAdded={handleStockAdded} />
+        <AddStock onStockAdded={handleStockAdded} prefilledSymbol={selectedSymbol} />
         <StockList refreshTrigger={refreshTrigger} onStockUpdated={handleStockAdded} />
       </main>
     </div>
