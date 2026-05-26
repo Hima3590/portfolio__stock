@@ -56,7 +56,7 @@ function App() {
       <main className="max-w-7xl mx-auto px-8 py-12">
         <StockSearch onSelectStock={handleSelectStock} />
         <StockSummary refreshTrigger={refreshTrigger} />
-        <PortfolioOverview />
+        <PortfolioOverview refreshTrigger={refreshTrigger} />
         <PortfolioCharts refreshTrigger={refreshTrigger} />
         <AddStock onStockAdded={handleStockAdded} prefilledSymbol={selectedSymbol} />
         <StockList refreshTrigger={refreshTrigger} onStockUpdated={handleStockAdded} />

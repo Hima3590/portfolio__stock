@@ -3,14 +3,14 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-export default function PortfolioOverview() {
+export default function PortfolioOverview({ refreshTrigger = 0 }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchPortfolioData();
-  }, []);
+  }, [refreshTrigger]);
 
   const fetchPortfolioData = async () => {
     try {
