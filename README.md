@@ -27,19 +27,6 @@ A full-stack web application that helps users track and analyze their stock inve
 4. External stock APIs provide market information.
 5. Dashboard displays portfolio performance and insights.
 
-## Project Structure
-Smart-Stock-Portfolio-Tracker/
-│
-├── frontend/
-│ └── React.js application
-│
-├── backend/
-│ └── Node.js + Express.js APIs
-│
-└── database/
-└── MongoDB collections
-
-
 ## Key Highlights
 - Built a complete full-stack application.
 - Implemented RESTful backend services.
